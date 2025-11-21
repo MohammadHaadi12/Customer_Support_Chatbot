@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+openai==2.8.0
+python-dotenv
+pydantic
+slowapi
