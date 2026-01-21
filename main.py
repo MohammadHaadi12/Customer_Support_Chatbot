@@ -8,6 +8,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 from fastapi import Request
+from fastapi.responses import StreamingResponse
+import time
 
 load_dotenv()
 
@@ -62,10 +64,16 @@ def simple_chat(prompt: str):
             }
         ],
 
-        reasoning={ "effort": "minimal"}
+        reasoning={ "effort": "minimal"},stream=True
     )
-    
-    return response.output_text
+   
+    #return response.output_text        # trying to stream responses instead of waiting of the full response
+
+
+    for event in response:
+        # Text chunks arrive here
+        if event.type == "response.output_text.delta":
+            yield event.delta
 
 @app.exception_handler(RateLimitExceeded)
 def rate_limit_handler(request: Request, exc: RateLimitExceeded):
@@ -74,8 +82,15 @@ def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         content={"error": "Too many requests. Try again later."}
     )
 
-@app.post("/chat")
-@limiter.limit("5/minute")
-def chat_endpoint(data: ChatData , request: Request):
-    return {"response": simple_chat(data.prompt)}
+# @app.post("/chat")
+# @limiter.limit("5/minute")
+# def chat_endpoint(data: ChatData , request: Request):
+#     return {"response": simple_chat(data.prompt)}
 
+@app.post("/chat/stream")
+@limiter.limit("5/minute")
+def chat_stream(data: ChatData, request: Request):
+    return StreamingResponse(
+        simple_chat(data.prompt),
+        media_type="text/plain"
+    )
